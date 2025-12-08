@@ -1,0 +1,35 @@
+services:
+  result:
+    build:
+      context: ./result
+      dockerfile: Dockerfile
+    env_file:
+      - .env.local.db
+    ports:
+      - 8888:8888
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.25
+  db:
+    image: postgres:18-alpine
+    restart: always
+    env_file:
+      - .env.local.db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 15s
+      retries: 5
+      timeout: 10s
+    container_name: db
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
