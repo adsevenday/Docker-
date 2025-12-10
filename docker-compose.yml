@@ -10,6 +10,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    ports:
+      - 6379:6379
     networks:
       - voting-network
     mem_limit: 128m
@@ -94,6 +96,8 @@ services:
       - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - voting-network
 
 
 # Définition des Volumes
