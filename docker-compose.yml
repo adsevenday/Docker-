@@ -10,8 +10,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - 6379:6379
     networks:
       - voting-network
     mem_limit: 128m
@@ -22,6 +20,7 @@ services:
     build:
       context: ./vote
       dockerfile: Dockerfile # Assurez-vous d'avoir ce Dockerfile
+    container_name: vote
     ports:
       - "8080:8080" # Port d'accès à l'application
     restart: unless-stopped
@@ -43,6 +42,7 @@ services:
       context: ./worker
       dockerfile: Dockerfile # Assurez-vous d'avoir ce Dockerfile
     restart: unless-stopped
+    container_name: worker
     environment:
       # L'application utilisera 'db' et 'redis' comme noms d'hôtes
       DB_HOST: db 
@@ -64,6 +64,7 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env.local.db # Contient les infos de connexion PostgreSQL
+    container_name: result
     ports:
       - 8888:8888
     restart: unless-stopped
@@ -92,8 +93,6 @@ services:
     container_name: db
     mem_limit: 1g
     cpus: 1.0
-    ports:
-      - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
