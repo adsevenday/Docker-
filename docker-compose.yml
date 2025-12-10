@@ -1,5 +1,3 @@
-version: '3.8' # Version recommandée
-
 services:
 
   #  SERVICE REDIS : Stockage temporaire des votes
@@ -96,26 +94,7 @@ services:
       - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
-<<<<<<< HEAD
-  worker:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile
-    
-    
 
-  vote:
-    build:
-      context: ./vote
-      dockerfile: Dockerfile
-    ports:
-      - 8080:8080
-    restart: unless-stopped
-    
-=======
-    networks:
-      - voting-network
->>>>>>> origin/Redis
 
 # Définition des Volumes
 volumes:
