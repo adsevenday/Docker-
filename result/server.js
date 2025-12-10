@@ -23,7 +23,13 @@ io.sockets.on("connection", function (socket) {
 })
 
 const pool = new pg.Pool({
-  connectionString: "postgres://postgres:postgres@localhost/postgres",
+  // Use the service name 'db' from the environment variable POSTGRES_HOST
+  user: process.env.POSTGRES_USER || "postgres",
+  password: process.env.POSTGRES_PASSWORD || "postgres",
+  host: process.env.POSTGRES_HOST || "localhost", // Should be 'db' when running in Compose
+  database: process.env.POSTGRES_DB || "postgres",
+  port: process.env.POSTGRES_PORT || 5432, // Default port is usually fine
+  // Note: Using individual parameters is often clearer than an interpolated connectionString
 })
 
 async.retry(
