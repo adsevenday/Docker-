@@ -1,18 +1,84 @@
+version: '3.8' # Version recommandée
+
 services:
+
+  #  SERVICE REDIS : Stockage temporaire des votes
+  redis:
+    image: redis:alpine # Image officielle légère
+    restart: unless-stopped
+    container_name: redis
+    healthcheck: # Pour que les autres services puissent attendre Redis
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voting-network
+    mem_limit: 128m
+    # (Pas besoin de volumes pour un simple cache, sauf persistance explicite)
+
+  #  SERVICE VOTE (Python) : Envoie les votes à Redis
+  vote:
+    build:
+      context: ./vote
+      dockerfile: Dockerfile # Assurez-vous d'avoir ce Dockerfile
+    ports:
+      - "8080:8080" # Port d'accès à l'application
+    restart: unless-stopped
+    environment:
+      # L'application utilisera le nom du service 'redis' pour se connecter
+      REDIS_HOST: redis 
+      # Les autres variables (OPTION_A, OPTION_B) peuvent être ajoutées ici
+    depends_on:
+      redis:
+        condition: service_healthy # Attend que Redis soit prêt
+    networks:
+      - voting-network
+    mem_limit: 256m
+    cpus: 0.25
+
+  # SERVICE WORKER (.NET Core) : Lit depuis Redis et écrit dans PostgreSQL
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile # Assurez-vous d'avoir ce Dockerfile
+    restart: unless-stopped
+    environment:
+      # L'application utilisera 'db' et 'redis' comme noms d'hôtes
+      DB_HOST: db 
+      REDIS_HOST: redis
+    depends_on:
+      db:
+        condition: service_healthy # Attend que PostgreSQL soit prêt
+      redis:
+        condition: service_healthy # Attend que Redis soit prêt
+    networks:
+      - voting-network
+    mem_limit: 256m
+    cpus: 0.25
+
+  # SERVICE RESULT (Node.js) : Affiche les résultats
   result:
     build:
       context: ./result
       dockerfile: Dockerfile
     env_file:
-      - .env.local.db
+      - .env.local.db # Contient les infos de connexion PostgreSQL
     ports:
       - 8888:8888
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      # Ajouter la dépendance à redis si l'app result lit aussi dans Redis (fréquent pour le temps réel)
+      redis:
+        condition: service_healthy
+    networks:
+      - voting-network
     mem_limit: 256m
     cpus: 0.25
+  
+  #  SERVICE DB (PostgreSQL) : Base de données permanente
   db:
     image: postgres:18-alpine
     restart: always
@@ -30,6 +96,7 @@ services:
       - 5432:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
+<<<<<<< HEAD
   worker:
     build:
       context: ./worker
@@ -45,6 +112,17 @@ services:
       - 8080:8080
     restart: unless-stopped
     
+=======
+    networks:
+      - voting-network
+>>>>>>> origin/Redis
 
+# Définition des Volumes
 volumes:
   postgres_data:
+  # redis_data: # Optionnel si vous souhaitez que les données Redis persistent
+
+# Définition du Réseau pour l'isolation
+networks:
+  voting-network:
+    driver: bridge
