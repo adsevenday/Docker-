@@ -28,7 +28,7 @@ const pool = new pg.Pool({
   host: process.env.POSTGRES_HOST,
   database: process.env.POSTGRES_DB,
   port: 5432
-})
+})      // modification de cette partie du code pour qu'il puisse se connecter autre que le localhost
 
 async.retry(
   {times: 1000, interval: 1000},

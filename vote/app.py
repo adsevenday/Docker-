@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 app.logger.setLevel(logging.INFO)
 
-redis_host = os.getenv('REDIS_HOST', 'redis')
+redis_host = os.getenv('REDIS_HOST', 'redis')   #modification de cette commande pour qu'il puisse se connecter au redis d'une autre que le localhost
 
 def get_redis():
     if not hasattr(Flask, 'redis'):
