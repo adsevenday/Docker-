@@ -3,8 +3,6 @@ services:
   #  SERVICE REDIS : Stockage temporaire des votes
   redis:
     image: redis:alpine # Image officielle légère
-    restart: unless-stopped
-    container_name: redis
     healthcheck: # Pour que les autres services puissent attendre Redis
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -17,18 +15,22 @@ services:
         delay: 10s
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 128m
+    ports:
+      - "6379:6379"
     networks:
       - voting-network
-    mem_limit: 128m
     # (Pas besoin de volumes pour un simple cache, sauf persistance explicite)
 
   #  SERVICE VOTE (Python) : Envoie les votes à Redis
   vote:
     image: vote
-    container_name: vote
     ports:
       - "8080:8080" # Port d'accès à l'application
-    restart: unless-stopped
     environment:
       # L'application utilisera le nom du service 'redis' pour se connecter
       REDIS_HOST: redis 
@@ -37,16 +39,21 @@ services:
       replicas: 2
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+        reservations:
+          memory: 128m
+          cpus: '0.25'
     networks:
       - voting-network
-    mem_limit: 256m
-    cpus: 0.25
+
+
 
   # SERVICE WORKER (.NET Core) : Lit depuis Redis et écrit dans PostgreSQL
   worker:
     image: worker
-    restart: unless-stopped
-    container_name: worker
     environment:
       # L'application utilisera 'db' et 'redis' comme noms d'hôtes
       DB_HOST: db 
@@ -55,10 +62,15 @@ services:
       replicas: 2
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+        reservations:
+          memory: 128m
+          cpus: '0.25'
     networks:
       - voting-network
-    mem_limit: 256m
-    cpus: 0.25
 
   # SERVICE RESULT (Node.js) : Affiche les résultats
   result:
@@ -73,22 +85,33 @@ services:
       replicas: 2
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
+        reservations:
+          memory: 128m
+          cpus: '0.25'
     networks:
       - voting-network
-    mem_limit: 256m
-    cpus: 0.25
   
   #  SERVICE DB (PostgreSQL) : Base de données permanente
   db:
     image: postgres:18-alpine
-    restart: always
     deploy:
-      replicas: 3
-      update_config:
-        parallelism: 1
-        delay: 10s
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
       restart_policy:
         condition: on-failure
+      resources:
+        limits:
+          memory: 256m
+          cpus: '1'
+        reservations:
+          memory: 128m
+          cpus: '0.5'
     env_file:
       - .env.local.db
     healthcheck:
@@ -96,9 +119,6 @@ services:
       interval: 15s
       retries: 5
       timeout: 10s
-    container_name: db
-    mem_limit: 1g
-    cpus: 1.0
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -113,4 +133,4 @@ volumes:
 # Définition du Réseau pour l'isolation
 networks:
   voting-network:
-    driver: bridge
+    driver: overlay
