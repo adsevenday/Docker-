@@ -16,15 +16,12 @@ namespace Worker
         {
             try
             {
-                // --- Configuration du Réseau (Utilise les noms de services Docker) ---
+                // ajout de ces variables afin qu'il puisse se connecter si on a definit des variable d'environnement dans le docker compose
                 var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
                 var redisHost = Environment.GetEnvironmentVariable("REDIS_HOST") ?? "localhost";
-                
-                // Préparation de la chaîne de connexion DB (pour connexion initiale et reconnexions)
-                // L'application utilisera "db" comme nom d'hôte si DB_HOST est bien configuré.
                 var dbConnectionString = $"Server={dbHost};Username=postgres;Password=postgres;";
 
-                // --- Connexions initiales ---
+                
                 var pgsql = OpenDbConnection(dbConnectionString);
                 var redisConn = OpenRedisConnection(redisHost);
                 var redis = redisConn.GetDatabase();
@@ -38,17 +35,17 @@ namespace Worker
 
                 while (true)
                 {
-                    // Délai de 100ms pour éviter de surcharger Redis/la CPU
+
                     Thread.Sleep(100); 
 
-                    // --- Gestion de la reconnexion à Redis ---
+                    // Se reconnecter à Redis si la connexion est perdue
                     if (redisConn == null || !redisConn.IsConnected) {
                         Console.WriteLine("Reconnecting Redis");
                         redisConn = OpenRedisConnection(redisHost);
                         redis = redisConn.GetDatabase();
                     }
                     
-                    // Récupère un vote de la file d'attente Redis (List Left Pop)
+                    
                     string json = redis.ListLeftPopAsync("votes").Result; 
                     
                     if (json != null)
@@ -56,7 +53,7 @@ namespace Worker
                         var vote = JsonConvert.DeserializeAnonymousType(json, definition);
                         Console.WriteLine($"Processing vote for '{vote.vote}' by '{vote.voter_id}'");
 
-                        // --- Gestion de la reconnexion à PostgreSQL ---
+                        // Se reconnecter à PostgreSQL si la connexion est perdue
                         if (!pgsql.State.Equals(System.Data.ConnectionState.Open))
                         {
                             Console.WriteLine("Reconnecting DB");
@@ -64,13 +61,13 @@ namespace Worker
                         }
                         else
                         {
-                            // Sauvegarde le vote dans PostgreSQL (avec UPSERT)
+                            
                             UpdateVote(pgsql, vote.voter_id, vote.vote); 
                         }
                     }
                     else
                     {
-                        // Si la file d'attente est vide, envoie un "keep-alive" à la DB
+                        
                         keepAliveCommand.ExecuteNonQuery(); 
                     }
                 }
@@ -108,7 +105,6 @@ namespace Worker
 
             Console.Error.WriteLine("Connected to db");
 
-            // Création de la table 'votes' si elle n'existe pas
             var command = connection.CreateCommand();
             command.CommandText = @"CREATE TABLE IF NOT EXISTS votes (
                                         id VARCHAR(255) NOT NULL UNIQUE,
@@ -121,7 +117,7 @@ namespace Worker
 
         private static ConnectionMultiplexer OpenRedisConnection(string hostname)
         {
-            // Résout le nom d'hôte Docker en IP pour une meilleure compatibilité avec StackExchange.Redis
+            // Use IP address to workaround https://github.com/StackExchange/StackExchange.Redis/issues/410
             var ipAddress = GetIp(hostname);
             Console.WriteLine($"Found redis at {ipAddress}");
 
@@ -152,7 +148,6 @@ namespace Worker
             var command = connection.CreateCommand();
             try
             {
-                // Tente d'insérer (premier vote)
                 command.CommandText = "INSERT INTO votes (id, vote) VALUES (@id, @vote)";
                 command.Parameters.AddWithValue("@id", voterId);
                 command.Parameters.AddWithValue("@vote", vote);
@@ -160,9 +155,8 @@ namespace Worker
             }
             catch (DbException)
             {
-                // Si l'insertion échoue (l'ID existe déjà), met à jour le vote (re-vote)
                 command.CommandText = "UPDATE votes SET vote = @vote WHERE id = @id";
-                command.Parameters.Clear(); // Nettoie les anciens paramètres
+                command.Parameters.Clear(); 
                 command.Parameters.AddWithValue("@id", voterId);
                 command.Parameters.AddWithValue("@vote", vote);
                 command.ExecuteNonQuery();
