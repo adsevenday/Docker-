@@ -10,6 +10,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
     networks:
       - voting-network
     mem_limit: 128m
@@ -17,9 +24,7 @@ services:
 
   #  SERVICE VOTE (Python) : Envoie les votes à Redis
   vote:
-    build:
-      context: ./vote
-      dockerfile: Dockerfile # Assurez-vous d'avoir ce Dockerfile
+    image: vote
     container_name: vote
     ports:
       - "8080:8080" # Port d'accès à l'application
@@ -28,9 +33,10 @@ services:
       # L'application utilisera le nom du service 'redis' pour se connecter
       REDIS_HOST: redis 
       # Les autres variables (OPTION_A, OPTION_B) peuvent être ajoutées ici
-    depends_on:
-      redis:
-        condition: service_healthy # Attend que Redis soit prêt
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
     networks:
       - voting-network
     mem_limit: 256m
@@ -38,20 +44,17 @@ services:
 
   # SERVICE WORKER (.NET Core) : Lit depuis Redis et écrit dans PostgreSQL
   worker:
-    build:
-      context: ./worker
-      dockerfile: Dockerfile # Assurez-vous d'avoir ce Dockerfile
+    image: worker
     restart: unless-stopped
     container_name: worker
     environment:
       # L'application utilisera 'db' et 'redis' comme noms d'hôtes
       DB_HOST: db 
       REDIS_HOST: redis
-    depends_on:
-      db:
-        condition: service_healthy # Attend que PostgreSQL soit prêt
-      redis:
-        condition: service_healthy # Attend que Redis soit prêt
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
     networks:
       - voting-network
     mem_limit: 256m
@@ -59,21 +62,17 @@ services:
 
   # SERVICE RESULT (Node.js) : Affiche les résultats
   result:
-    build:
-      context: ./result
-      dockerfile: Dockerfile
+    image: result
     env_file:
       - .env.local.db # Contient les infos de connexion PostgreSQL
     container_name: result
     ports:
       - 8888:8888
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-      # Ajouter la dépendance à redis si l'app result lit aussi dans Redis (fréquent pour le temps réel)
-      redis:
-        condition: service_healthy
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
     networks:
       - voting-network
     mem_limit: 256m
@@ -83,6 +82,13 @@ services:
   db:
     image: postgres:18-alpine
     restart: always
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
     env_file:
       - .env.local.db
     healthcheck:

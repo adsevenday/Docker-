@@ -1,0 +1,9 @@
+Pour ajouter la partie swarm, il faudrait au prealable que l'on push les images que l'on a build
+
+docker push vote
+docker push worker
+docker push result
+
+nous avions mis des depends_on dans le docker compose qui ne seront plus necessaire
+
+Ensuite il faudrait que l'on 
