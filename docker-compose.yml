@@ -9,7 +9,7 @@ services:
       timeout: 5s
       retries: 5
     deploy:
-      replicas: 3
+      replicas: 1
       update_config:
         parallelism: 1
         delay: 10s
@@ -56,9 +56,12 @@ services:
     image: worker
     environment:
       # L'application utilisera 'db' et 'redis' comme noms d'hôtes
-      DB_HOST: db 
-      REDIS_HOST: redis
+      DB_HOST: tasks.db 
+      REDIS_HOST: tasks.redis
     deploy:
+      placement:
+        constraints:
+          - node.role == manager
       replicas: 2
       restart_policy:
         condition: on-failure
@@ -75,14 +78,13 @@ services:
   # SERVICE RESULT (Node.js) : Affiche les résultats
   result:
     image: result
+    command: ["sh", "-c", "while ! nc -z db 5432; do sleep 1; done; python app.py"]
     env_file:
       - .env.local.db # Contient les infos de connexion PostgreSQL
-    container_name: result
     ports:
       - 8888:8888
-    restart: unless-stopped
     deploy:
-      replicas: 2
+      replicas: 1
       restart_policy:
         condition: on-failure
       resources:
@@ -125,6 +127,8 @@ services:
       - voting-network
 
 
+
+
 # Définition des Volumes
 volumes:
   postgres_data:
@@ -134,3 +138,4 @@ volumes:
 networks:
   voting-network:
     driver: overlay
+    attachable: true

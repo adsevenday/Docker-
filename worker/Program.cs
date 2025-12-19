@@ -22,7 +22,8 @@ namespace Worker
                 
                 // Préparation de la chaîne de connexion DB (pour connexion initiale et reconnexions)
                 // L'application utilisera "db" comme nom d'hôte si DB_HOST est bien configuré.
-                var dbConnectionString = $"Server={dbHost};Username=postgres;Password=postgres;";
+                // Explicitement changer pour le swarm
+                var dbConnectionString = $"Host={dbHost};Database=postgres;Username=postgres;Password=postgres;Port=5432;";
 
                 // --- Connexions initiales ---
                 var pgsql = OpenDbConnection(dbConnectionString);
